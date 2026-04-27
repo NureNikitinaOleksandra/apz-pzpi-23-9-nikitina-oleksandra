@@ -1,0 +1,64 @@
+# Приклад 1. Логіка мікросервісу (на прикладі контентної фільтрації)
+def recommend_tracks(user_profile, audio_catalog):
+    """
+    Мікросервіс рекомендацій: приймає профіль користувача (наприклад, з Bigtable) 
+    та базу треків (з Vitess), відбираючи ті, що відповідають смакам.
+    """
+    recommendations = []
+    for track in audio_catalog:
+        # Спрощена логіка: шукаємо збіг за жанром
+        if track["genre"] in user_profile["favorite_genres"]:
+            recommendations.append(track)
+            
+    return recommendations[:5] # Повертаємо Топ-5 треків клієнту
+
+# Імітація отриманих даних
+current_user = {"user_id": "101", "favorite_genres": ["rock", "synthwave"]}
+catalog_data = [
+    {"id": "1", "title": "Bohemian Rhapsody", "genre": "rock"},
+    {"id": "2", "title": "Take On Me", "genre": "synthwave"},
+    {"id": "3", "title": "Shape of You", "genre": "pop"},
+]
+
+# Виклик функції мікросервісу
+print(recommend_tracks(current_user, catalog_data))
+# Вивід: [{'title': 'Bohemian Rhapsody'...}, {'title': 'Take On Me'...}]
+
+
+
+
+# Приклад 2. Асинхронна подієво-орієнтована взаємодія (Event-Driven)
+import queue
+import threading
+import time
+
+# Імітація брокера повідомлень (Message Broker / Pub-Sub)
+event_queue = queue.Queue() 
+
+def client_event_producer():
+    """Імітує клієнтський застосунок, який генерує події під час прослуховування"""
+    events = ["SONG_PLAYED: id_123", "SONG_LIKED: id_123", "SONG_SKIPPED: id_456"]
+    for event in events:
+        print(f"[КЛІЄНТ] Згенеровано подію та відправлено в чергу: {event}")
+        event_queue.put(event)
+        time.sleep(0.5) # Імітація часу між діями користувача
+
+def analytics_service_consumer():
+    """Імітує мікросервіс бекенду, який фоново вигрібає події з черги для ML"""
+    while True:
+        if not event_queue.empty():
+            event = event_queue.get()
+            print(f"[БЕКЕНД] Асинхронна обробка події для оновлення рекомендацій: {event}")
+        else:
+            break
+
+# Запуск двох незалежних процесів (потоків): клієнта та сервера
+producer_thread = threading.Thread(target=client_event_producer)
+consumer_thread = threading.Thread(target=analytics_service_consumer)
+
+producer_thread.start()
+time.sleep(1) # Даємо системі час для старту
+consumer_thread.start()
+
+producer_thread.join()
+consumer_thread.join()
